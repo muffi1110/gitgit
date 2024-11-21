@@ -1,0 +1,37 @@
+name: Deploy Power BI Report
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install Power BI REST API Client
+      run: |
+        sudo apt-get install jq
+        sudo apt-get install curl
+
+    - name: Get Access Token
+      id: get_token
+      run: |
+        TOKEN=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+          -d "client_id=${{ secrets.CLIENT_ID }}" \
+          -d "client_secret=${{ secrets.CLIENT_SECRET }}" \
+          -d "scope=https://analysis.windows.net/powerbi/api/.default" \
+          -d "grant_type=client_credentials" \
+          https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/token | jq -r '.access_token')
+        echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+
+    - name: Deploy Power BI Report
+      run: |
+        curl -X PUT -H "Authorization: Bearer ${{ env.TOKEN }}" \
+          -H "Content-Type: application/octet-stream" \
+          --data-binary ./Sample data.pbix \
+          "https://api.powerbi.com/v1.0/myorg/groups/${{ secrets.WORKSPACE_ID }}/reports/${{ secrets.REPORT_NAME }}/Import"
